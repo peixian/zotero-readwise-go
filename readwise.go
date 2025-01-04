@@ -18,16 +18,6 @@ type ReadwiseClient struct {
 	rateLimit *time.Ticker // For rate limiting
 }
 
-// type ReadwiseHighlight struct {
-// 	Text          string `json:"text"`
-// 	Title         string `json:"title"`
-// 	Author        string `json:"author"`
-// 	SourceType    string `json:"source_type"`
-// 	Category      string `json:"category"`
-// 	Note          string `json:"note,omitempty"`
-// 	HighlightedAt string `json:"highlighted_at,omitempty"`
-// }
-
 type ReadwiseHighlight struct {
 	Text          string `json:"text"`
 	Title         string `json:"title"`

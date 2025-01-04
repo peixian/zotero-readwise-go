@@ -38,21 +38,6 @@ type Link struct {
 	Type string `json:"type,omitempty"`
 }
 
-// type ItemData struct {
-// 	Key             string    `json:"key"`
-// 	Version         int       `json:"version"`
-// 	ParentItem      string    `json:"parentItem"`
-// 	ItemType        string    `json:"itemType"`
-// 	Title           string    `json:"title"`
-// 	Creators        []Creator `json:"creators"`
-// 	Date            string    `json:"date"`
-// 	AnnotationType  string    `json:"annotationType"`
-// 	AnnotationText  string    `json:"annotationText"`
-// 	AnnotationColor string    `json:"annotationColor"`
-// 	DateAdded       string    `json:"dateAdded"`
-// 	DateModified    string    `json:"dateModified"`
-// }
-
 type ItemData struct {
 	Key                 string    `json:"key"`
 	Version             int       `json:"version"`
@@ -84,12 +69,6 @@ type APIClient struct {
 	apiKey  string
 	baseURL string
 }
-
-// type ParentDetails struct {
-// 	Title   string
-// 	Authors []Creator
-// 	Date    string
-// }
 
 type ParentDetails struct {
 	Title    string
@@ -378,45 +357,6 @@ func (c *APIClient) fetchParentDetails(item AnnotationItem) (*ParentDetails, err
 	}, nil
 }
 
-// func (c *APIClient) fetchParentDetails(item AnnotationItem) (*ParentDetails, error) {
-// 	// First level - get immediate parent (usually attachment)
-// 	parent, err := c.makeRequest(item.Links.Up.Href)
-// 	if err != nil {
-// 		return nil, fmt.Errorf("fetching immediate parent: %w", err)
-// 	}
-
-// 	var parentItem AnnotationItem
-// 	if err := json.Unmarshal(parent, &parentItem); err != nil {
-// 		return nil, fmt.Errorf("parsing parent JSON: %w", err)
-// 	}
-
-// 	// If parent is attachment type, fetch grandparent
-// 	if parentItem.Data.ItemType == "attachment" {
-// 		grandparent, err := c.makeRequest(parentItem.Links.Up.Href)
-// 		if err != nil {
-// 			return nil, fmt.Errorf("fetching grandparent: %w", err)
-// 		}
-
-// 		var grandparentItem AnnotationItem
-// 		if err := json.Unmarshal(grandparent, &grandparentItem); err != nil {
-// 			return nil, fmt.Errorf("parsing grandparent JSON: %w", err)
-// 		}
-
-// 		return &ParentDetails{
-// 			Title:   grandparentItem.Data.Title,
-// 			Authors: grandparentItem.Data.Creators,
-// 			Date:    grandparentItem.Data.Date,
-// 		}, nil
-// 	}
-
-// 	// If parent is not attachment, use parent details
-// 	return &ParentDetails{
-// 		Title:   parentItem.Data.Title,
-// 		Authors: parentItem.Data.Creators,
-// 		Date:    parentItem.Data.Date,
-// 	}, nil
-// }
-
 func (c *APIClient) processAnnotations(annotations []AnnotationItem) error {
 	fmt.Println("annotation_text,title,authors,date")
 	var skipped int
@@ -457,49 +397,6 @@ func (c *APIClient) processAnnotations(annotations []AnnotationItem) error {
 
 	return nil
 }
-
-// func (c *APIClient) ConvertToReadwiseHighlights(annotations []AnnotationItem) ([]ReadwiseHighlight, error) {
-//     var highlights []ReadwiseHighlight
-
-//     for _, annotation := range annotations {
-//         if strings.TrimSpace(annotation.Data.AnnotationText) == "" {
-//             continue
-//         }
-
-//         details, err := c.fetchParentDetails(annotation)
-//         if err != nil {
-//             fmt.Fprintf(os.Stderr, "Error fetching parent details for %s: %v\n", annotation.Key, err)
-//             continue
-//         }
-
-//         author := formatCreators(details.Authors)
-//         if author == "" {
-//             author = "Unknown Author"
-//         }
-
-//         sourceType, category := mapZoteroTypeToReadwise(details.ItemType)
-
-//         highlight := ReadwiseHighlight{
-//             Text:          annotation.Data.AnnotationText,
-//             Title:         details.Title,
-//             Author:        author,
-//             SourceType:    sourceType,
-//             Category:      category,
-//             HighlightedAt: annotation.Data.DateAdded,
-//         }
-
-//         if annotation.Data.AnnotationPageLabel != "" {
-//             if pageNum, err := strconv.Atoi(annotation.Data.AnnotationPageLabel); err == nil {
-//                 highlight.Location = pageNum
-//                 highlight.LocationType = "page"
-//             }
-//         }
-
-//         highlights = append(highlights, highlight)
-//     }
-
-//     return highlights, nil
-// }
 
 func (c *APIClient) ConvertToReadwiseHighlights(annotations []AnnotationItem) ([]ReadwiseHighlight, error) {
 	var highlights []ReadwiseHighlight
