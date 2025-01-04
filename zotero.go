@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-
-
 type FirstLevelResponse []AnnotationItem
 
 type AnnotationItem struct {
@@ -40,19 +38,37 @@ type Link struct {
 	Type string `json:"type,omitempty"`
 }
 
+// type ItemData struct {
+// 	Key             string    `json:"key"`
+// 	Version         int       `json:"version"`
+// 	ParentItem      string    `json:"parentItem"`
+// 	ItemType        string    `json:"itemType"`
+// 	Title           string    `json:"title"`
+// 	Creators        []Creator `json:"creators"`
+// 	Date            string    `json:"date"`
+// 	AnnotationType  string    `json:"annotationType"`
+// 	AnnotationText  string    `json:"annotationText"`
+// 	AnnotationColor string    `json:"annotationColor"`
+// 	DateAdded       string    `json:"dateAdded"`
+// 	DateModified    string    `json:"dateModified"`
+// }
+
 type ItemData struct {
-	Key             string    `json:"key"`
-	Version         int       `json:"version"`
-	ParentItem      string    `json:"parentItem"`
-	ItemType        string    `json:"itemType"`
-	Title           string    `json:"title"`
-	Creators        []Creator `json:"creators"`
-	Date            string    `json:"date"`
-	AnnotationType  string    `json:"annotationType"`
-	AnnotationText  string    `json:"annotationText"`
-	AnnotationColor string    `json:"annotationColor"`
-	DateAdded       string    `json:"dateAdded"`
-	DateModified    string    `json:"dateModified"`
+	Key                 string    `json:"key"`
+	Version             int       `json:"version"`
+	ParentItem          string    `json:"parentItem"`
+	ItemType            string    `json:"itemType"`
+	Title               string    `json:"title"`
+	Creators            []Creator `json:"creators"`
+	Date                string    `json:"date"`
+	URL                 string    `json:"url"`
+	DOI                 string    `json:"DOI,omitempty"` // Also grab DOI if available
+	AnnotationType      string    `json:"annotationType"`
+	AnnotationText      string    `json:"annotationText"`
+	AnnotationColor     string    `json:"annotationColor"`
+	AnnotationPageLabel string    `json:"annotationPageLabel"`
+	DateAdded           string    `json:"dateAdded"`
+	DateModified        string    `json:"dateModified"`
 }
 
 type Creator struct {
@@ -63,19 +79,62 @@ type Creator struct {
 	FieldMode   int    `json:"fieldMode,omitempty"` // 0 for two-field (person), 1 for single-field (institution)
 }
 
-
 type APIClient struct {
 	client  *http.Client
 	apiKey  string
 	baseURL string
 }
 
+// type ParentDetails struct {
+// 	Title   string
+// 	Authors []Creator
+// 	Date    string
+// }
+
 type ParentDetails struct {
-	Title   string
-	Authors []Creator
-	Date    string
+	Title    string
+	Authors  []Creator
+	Date     string
+	ItemType string
+	URL      string
 }
 
+func mapZoteroTypeToReadwise(zoteroType string) (sourceType, category string) {
+	// Default values
+	sourceType = "zotero"
+	category = "articles"
+
+	// Types that should be categorized as books in Readwise
+	bookTypes := map[string]bool{
+		"book":         true,
+		"thesis":       true,
+		"manuscript":   true,
+		"bookSection":  true,
+		"monograph":    true,
+		"dissertation": true,
+	}
+
+	// Types that should be categorized as articles
+	articleTypes := map[string]bool{
+		"journalArticle":   true,
+		"preprint":         true,
+		"report":           true,
+		"conferencePaper":  true,
+		"magazineArticle":  true,
+		"newspaperArticle": true,
+		"webpage":          true,
+		"blogPost":         true,
+		"document":         true,
+	}
+
+	if bookTypes[zoteroType] {
+		category = "books"
+	} else if articleTypes[zoteroType] {
+		category = "articles"
+	}
+
+	return sourceType, category
+}
 
 func formatCreator(c Creator) string {
 	switch {
@@ -170,8 +229,6 @@ func humanizeCreatorType(creatorType string) string {
 	return strings.ToUpper(creatorType[:1]) + creatorType[1:]
 }
 
-
-
 func NewAPIClient(apiKey string) *APIClient {
 	return &APIClient{
 		client:  &http.Client{},
@@ -186,7 +243,7 @@ func (c *APIClient) makeRequest(url string) ([]byte, error) {
 		return nil, fmt.Errorf("creating request: %w", err)
 	}
 
-	//	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.apiKey))
 	req.Header.Add("Zotero-API-Version", "3")
 
 	maxRetries := 3
@@ -291,20 +348,74 @@ func (c *APIClient) fetchParentDetails(item AnnotationItem) (*ParentDetails, err
 			return nil, fmt.Errorf("parsing grandparent JSON: %w", err)
 		}
 
+		// Construct URL, preferring DOI if available
+		url := grandparentItem.Data.URL
+		if grandparentItem.Data.DOI != "" {
+			url = fmt.Sprintf("https://doi.org/%s", grandparentItem.Data.DOI)
+		}
+
 		return &ParentDetails{
-			Title:   grandparentItem.Data.Title,
-			Authors: grandparentItem.Data.Creators,
-			Date:    grandparentItem.Data.Date,
+			Title:    grandparentItem.Data.Title,
+			Authors:  grandparentItem.Data.Creators,
+			Date:     grandparentItem.Data.Date,
+			ItemType: grandparentItem.Data.ItemType,
+			URL:      url,
 		}, nil
 	}
 
 	// If parent is not attachment, use parent details
+	url := parentItem.Data.URL
+	if parentItem.Data.DOI != "" {
+		url = fmt.Sprintf("https://doi.org/%s", parentItem.Data.DOI)
+	}
+
 	return &ParentDetails{
-		Title:   parentItem.Data.Title,
-		Authors: parentItem.Data.Creators,
-		Date:    parentItem.Data.Date,
+		Title:    parentItem.Data.Title,
+		Authors:  parentItem.Data.Creators,
+		Date:     parentItem.Data.Date,
+		ItemType: parentItem.Data.ItemType,
+		URL:      url,
 	}, nil
 }
+
+// func (c *APIClient) fetchParentDetails(item AnnotationItem) (*ParentDetails, error) {
+// 	// First level - get immediate parent (usually attachment)
+// 	parent, err := c.makeRequest(item.Links.Up.Href)
+// 	if err != nil {
+// 		return nil, fmt.Errorf("fetching immediate parent: %w", err)
+// 	}
+
+// 	var parentItem AnnotationItem
+// 	if err := json.Unmarshal(parent, &parentItem); err != nil {
+// 		return nil, fmt.Errorf("parsing parent JSON: %w", err)
+// 	}
+
+// 	// If parent is attachment type, fetch grandparent
+// 	if parentItem.Data.ItemType == "attachment" {
+// 		grandparent, err := c.makeRequest(parentItem.Links.Up.Href)
+// 		if err != nil {
+// 			return nil, fmt.Errorf("fetching grandparent: %w", err)
+// 		}
+
+// 		var grandparentItem AnnotationItem
+// 		if err := json.Unmarshal(grandparent, &grandparentItem); err != nil {
+// 			return nil, fmt.Errorf("parsing grandparent JSON: %w", err)
+// 		}
+
+// 		return &ParentDetails{
+// 			Title:   grandparentItem.Data.Title,
+// 			Authors: grandparentItem.Data.Creators,
+// 			Date:    grandparentItem.Data.Date,
+// 		}, nil
+// 	}
+
+// 	// If parent is not attachment, use parent details
+// 	return &ParentDetails{
+// 		Title:   parentItem.Data.Title,
+// 		Authors: parentItem.Data.Creators,
+// 		Date:    parentItem.Data.Date,
+// 	}, nil
+// }
 
 func (c *APIClient) processAnnotations(annotations []AnnotationItem) error {
 	fmt.Println("annotation_text,title,authors,date")
@@ -347,6 +458,48 @@ func (c *APIClient) processAnnotations(annotations []AnnotationItem) error {
 	return nil
 }
 
+// func (c *APIClient) ConvertToReadwiseHighlights(annotations []AnnotationItem) ([]ReadwiseHighlight, error) {
+//     var highlights []ReadwiseHighlight
+
+//     for _, annotation := range annotations {
+//         if strings.TrimSpace(annotation.Data.AnnotationText) == "" {
+//             continue
+//         }
+
+//         details, err := c.fetchParentDetails(annotation)
+//         if err != nil {
+//             fmt.Fprintf(os.Stderr, "Error fetching parent details for %s: %v\n", annotation.Key, err)
+//             continue
+//         }
+
+//         author := formatCreators(details.Authors)
+//         if author == "" {
+//             author = "Unknown Author"
+//         }
+
+//         sourceType, category := mapZoteroTypeToReadwise(details.ItemType)
+
+//         highlight := ReadwiseHighlight{
+//             Text:          annotation.Data.AnnotationText,
+//             Title:         details.Title,
+//             Author:        author,
+//             SourceType:    sourceType,
+//             Category:      category,
+//             HighlightedAt: annotation.Data.DateAdded,
+//         }
+
+//         if annotation.Data.AnnotationPageLabel != "" {
+//             if pageNum, err := strconv.Atoi(annotation.Data.AnnotationPageLabel); err == nil {
+//                 highlight.Location = pageNum
+//                 highlight.LocationType = "page"
+//             }
+//         }
+
+//         highlights = append(highlights, highlight)
+//     }
+
+//     return highlights, nil
+// }
 
 func (c *APIClient) ConvertToReadwiseHighlights(annotations []AnnotationItem) ([]ReadwiseHighlight, error) {
 	var highlights []ReadwiseHighlight
@@ -362,13 +515,28 @@ func (c *APIClient) ConvertToReadwiseHighlights(annotations []AnnotationItem) ([
 			continue
 		}
 
+		author := formatCreators(details.Authors)
+		if author == "" {
+			author = "Unknown Author"
+		}
+
+		sourceType, category := mapZoteroTypeToReadwise(details.ItemType)
+
 		highlight := ReadwiseHighlight{
 			Text:          annotation.Data.AnnotationText,
 			Title:         details.Title,
-			Author:        formatCreators(details.Authors),
-			SourceType:    "zotero",
-			Category:      "articles",
+			Author:        author,
+			SourceType:    sourceType,
+			Category:      category,
 			HighlightedAt: annotation.Data.DateAdded,
+			SourceURL:     details.URL,
+		}
+
+		if annotation.Data.AnnotationPageLabel != "" {
+			if pageNum, err := strconv.Atoi(annotation.Data.AnnotationPageLabel); err == nil {
+				highlight.Location = pageNum
+				highlight.LocationType = "page"
+			}
 		}
 
 		highlights = append(highlights, highlight)

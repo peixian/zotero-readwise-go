@@ -11,14 +11,22 @@ import (
 	"time"
 )
 
-
-
 type ReadwiseClient struct {
 	client    *http.Client
 	apiKey    string
 	baseURL   string
 	rateLimit *time.Ticker // For rate limiting
 }
+
+// type ReadwiseHighlight struct {
+// 	Text          string `json:"text"`
+// 	Title         string `json:"title"`
+// 	Author        string `json:"author"`
+// 	SourceType    string `json:"source_type"`
+// 	Category      string `json:"category"`
+// 	Note          string `json:"note,omitempty"`
+// 	HighlightedAt string `json:"highlighted_at,omitempty"`
+// }
 
 type ReadwiseHighlight struct {
 	Text          string `json:"text"`
@@ -28,6 +36,9 @@ type ReadwiseHighlight struct {
 	Category      string `json:"category"`
 	Note          string `json:"note,omitempty"`
 	HighlightedAt string `json:"highlighted_at,omitempty"`
+	Location      int    `json:"location,omitempty"`
+	LocationType  string `json:"location_type,omitempty"`
+	SourceURL     string `json:"source_url,omitempty"`
 }
 
 type ReadwiseRequest struct {
